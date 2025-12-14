@@ -198,13 +198,11 @@ function renderGames(list) {
     const card = document.createElement("div");
     card.className = "card";
 
-    // клик по карточке открывает игру
     card.addEventListener("click", () => openGame(g.id));
 
-    // cover
+    // Cover
     const cover = document.createElement("div");
     cover.className = "game-cover";
-    cover.style.position = "relative";
 
     if (g.cover) {
       const img = document.createElement("img");
@@ -213,8 +211,6 @@ function renderGames(list) {
       cover.appendChild(img);
     } else {
       const no = document.createElement("div");
-      no.style.padding = "1rem";
-      no.style.color = "#9ca3af";
       no.textContent = "Нет изображения";
       cover.appendChild(no);
     }
@@ -232,7 +228,6 @@ function renderGames(list) {
       });
       cover.appendChild(btn);
 
-      // === КНОПКА УДАЛЕНИЯ (твоя) ===
       const delBtn = document.createElement("button");
       delBtn.className = "btn-small";
       delBtn.textContent = "Удал.";
@@ -244,19 +239,12 @@ function renderGames(list) {
 
       delBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
-        console.log("DELETE click handler fired, id=", g.id, "user=", currentUser?.email);
-        if (!confirm(`Удалить игру \"${g.title || ""}\"?`)) return;
+        if (!confirm(`Удалить игру "${g.title || ""}"?`)) return;
         try {
           const res = await supabase.from("games").delete().eq("id", g.id);
-          console.log("Delete response ->", res);
-          if (res.error) {
-            console.error("Delete error detail:", res.error);
-            return showError("Ошибка удаления игры", res.error);
-          }
-          console.log("Deleted data:", res.data);
+          if (res.error) return showError("Ошибка удаления игры", res.error);
           await startGamesListener();
         } catch (err) {
-          console.error("Exception during delete:", err);
           showError("Ошибка при удалении", err);
         }
       });
@@ -270,7 +258,7 @@ function renderGames(list) {
 
     const footer = document.createElement("div");
     footer.className = "card-footer";
-    footer.innerHTML = `<span class="pill">${escapeHTML(g.genre || "")}</span>`;
+    footer.innerHTML = `<span class="pill">${escapeHTML(g.genre || "")}</span>`; // Платформа убрана
 
     card.appendChild(cover);
     card.appendChild(header);
@@ -279,6 +267,7 @@ function renderGames(list) {
     cardsContainer.appendChild(card);
   });
 }
+
 
 // ----------------------------
 // ОТКРЫТИЕ ОДНОЙ ИГРЫ (начало)
@@ -456,7 +445,6 @@ addGameBtn.addEventListener("click", () => {
     </form>
   `);
 
-  // Надёжно навешиваем обработчики *после* вставки HTML
   const cancel = document.getElementById("cancelAdd");
   const form = document.getElementById("addGameForm");
 
@@ -466,7 +454,6 @@ addGameBtn.addEventListener("click", () => {
     e.preventDefault();
     try {
       const title = document.getElementById("gameTitle").value.trim();
-      const platform = document.getElementById("gamePlatform").value.trim();
       const genre = document.getElementById("gameGenre").value.trim();
       const fileEl = document.getElementById("gameCoverFile");
       const file = fileEl?.files?.[0];
@@ -479,9 +466,7 @@ addGameBtn.addEventListener("click", () => {
           .from("images")
           .upload(filename, file, { contentType: file.type });
 
-        if (uploadError) {
-          return showError("Ошибка при загрузке изображения", uploadError);
-        }
+        if (uploadError) return showError("Ошибка при загрузке изображения", uploadError);
 
         const { data } = supabase.storage.from("images").getPublicUrl(filename);
         if (data?.publicUrl) coverUrl = data.publicUrl;
@@ -489,7 +474,6 @@ addGameBtn.addEventListener("click", () => {
 
       const { error: insertErr } = await supabase.from("games").insert({
         title,
-        platform,
         genre,
         cover: coverUrl,
         guide: ""
@@ -497,7 +481,6 @@ addGameBtn.addEventListener("click", () => {
 
       if (insertErr) return showError("Ошибка добавления игры", insertErr);
 
-      // обновляем список и закрываем модалку
       await startGamesListener();
       closeModal();
     } catch (err) {
@@ -505,6 +488,7 @@ addGameBtn.addEventListener("click", () => {
     }
   };
 });
+
 
 // ----------------------------
 // РЕДАКТИРОВАНИЕ ИГРЫ
@@ -519,7 +503,6 @@ async function editGame(id) {
       <h3>Редактирование игры</h3>
       <form id="editGameForm">
         <div style="margin:0.35rem 0;"><label>Название</label><br><input id="editTitle" value="${escapeHTML(game.title)}" style="width:100%;"></div>
-        <div style="margin:0.35rem 0;"><label>Платформа</label><br><input id="editPlatform" value="${escapeHTML(game.platform || "")}" style="width:100%;"></div>
         <div style="margin:0.35rem 0;"><label>Жанр</label><br><input id="editGenre" value="${escapeHTML(game.genre || "")}" style="width:100%;"></div>
         <div style="margin:0.35rem 0;"><label>Новая обложка</label><br><input id="editCoverFile" type="file" accept="image/*"></div>
 
@@ -536,7 +519,6 @@ async function editGame(id) {
       e.preventDefault();
       try {
         const title = document.getElementById("editTitle").value.trim();
-        const platform = document.getElementById("editPlatform").value.trim();
         const genre = document.getElementById("editGenre").value.trim();
         const file = document.getElementById("editCoverFile").files[0];
 
@@ -556,7 +538,7 @@ async function editGame(id) {
 
         const { error: updateErr } = await supabase
           .from("games")
-          .update({ title, platform, genre, cover: coverUrl })
+          .update({ title, genre, cover: coverUrl })
           .eq("id", id);
 
         if (updateErr) return showError("Ошибка сохранения игры", updateErr);
