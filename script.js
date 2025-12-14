@@ -198,13 +198,11 @@ function renderGames(list) {
     const card = document.createElement("div");
     card.className = "card";
 
-    // клик по карточке открывает игру
     card.addEventListener("click", () => openGame(g.id));
 
-    // cover
+    // Cover
     const cover = document.createElement("div");
     cover.className = "game-cover";
-    cover.style.position = "relative";
 
     if (g.cover) {
       const img = document.createElement("img");
@@ -213,8 +211,6 @@ function renderGames(list) {
       cover.appendChild(img);
     } else {
       const no = document.createElement("div");
-      no.style.padding = "1rem";
-      no.style.color = "#9ca3af";
       no.textContent = "Нет изображения";
       cover.appendChild(no);
     }
@@ -232,7 +228,6 @@ function renderGames(list) {
       });
       cover.appendChild(btn);
 
-      // === КНОПКА УДАЛЕНИЯ (твоя) ===
       const delBtn = document.createElement("button");
       delBtn.className = "btn-small";
       delBtn.textContent = "Удал.";
@@ -244,19 +239,12 @@ function renderGames(list) {
 
       delBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
-        console.log("DELETE click handler fired, id=", g.id, "user=", currentUser?.email);
-        if (!confirm(`Удалить игру \"${g.title || ""}\"?`)) return;
+        if (!confirm(`Удалить игру "${g.title || ""}"?`)) return;
         try {
           const res = await supabase.from("games").delete().eq("id", g.id);
-          console.log("Delete response ->", res);
-          if (res.error) {
-            console.error("Delete error detail:", res.error);
-            return showError("Ошибка удаления игры", res.error);
-          }
-          console.log("Deleted data:", res.data);
+          if (res.error) return showError("Ошибка удаления игры", res.error);
           await startGamesListener();
         } catch (err) {
-          console.error("Exception during delete:", err);
           showError("Ошибка при удалении", err);
         }
       });
@@ -270,7 +258,7 @@ function renderGames(list) {
 
     const footer = document.createElement("div");
     footer.className = "card-footer";
-    footer.innerHTML = `<span class="pill">${escapeHTML(g.genre || "")}</span>`;
+    footer.innerHTML = `<span class="pill">${escapeHTML(g.genre || "")}</span>`; // Платформа убрана
 
     card.appendChild(cover);
     card.appendChild(header);
@@ -279,6 +267,7 @@ function renderGames(list) {
     cardsContainer.appendChild(card);
   });
 }
+
 
 // ----------------------------
 // ОТКРЫТИЕ ОДНОЙ ИГРЫ (начало)
