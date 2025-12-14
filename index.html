@@ -32,44 +32,36 @@
 
     /* Карточки и обложки */
     .card {
-      border-radius:1rem;
-      background: radial-gradient(circle at top left, rgba(30,64,175,0.35), rgba(15,23,42,0.95));
-      border:1px solid rgba(148,163,184,0.35);
-      padding:0.85rem 0.9rem;
-      box-shadow:0 12px 30px rgba(15,23,42,0.7);
-      display:flex;
-      flex-direction:column;
-      gap:0.45rem;
-      cursor:pointer;
-      transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, background 0.2s ease;
-    }
-    .card:hover { transform: translateY(-3px); box-shadow:0 16px 40px rgba(15,23,42,0.95); border-color:#6366f1; background: radial-gradient(circle at top left, rgba(79,70,229,0.5), rgba(15,23,42,0.98)); }
-    .card-header { display:flex; justify-content:space-between; align-items:center; gap:0.3rem; }
-    .card h2 { font-size:0.95rem; font-weight:600; }
-    .card-footer { margin-top:0.3rem; display:flex; justify-content:flex-start; align-items:center; font-size:0.75rem; color:#9ca3af; flex-wrap:wrap; gap:0.25rem; }
-    .pill { border-radius:999px; padding:0.15rem 0.6rem; border:1px solid rgba(148,163,184,0.6); font-size:0.7rem; }
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, background 0.2s ease;
+  border-radius: 1rem;
+  background: radial-gradient(circle at top left, rgba(30,64,175,0.35), rgba(15,23,42,0.95));
+  border: 1px solid rgba(148,163,184,0.35);
+  box-shadow: 0 12px 30px rgba(15,23,42,0.7);
 
-    .breadcrumbs { font-size:0.8rem; color:#9ca3af; margin-bottom:0.75rem; }
-    .breadcrumbs span { cursor:pointer; }
-    .breadcrumbs span:hover { text-decoration:underline; }
-    footer { font-size:0.75rem; text-align:center; padding:0.75rem 1rem 1rem; color:#6b7280; border-top:1px solid rgba(31,41,55,0.7); background: rgba(15,23,42,0.9); }
+  /* Фиксированная высота, чтобы карточки не растягивались */
+  height: 320px;
+  overflow: hidden;
+}
 
-    /* Фиксированные обложки */
-    .game-cover {
-      width:100%;
-      border-radius:0.9rem;
-      overflow:hidden;
-      margin-bottom:0.6rem;
-      background:#020617;
-      display:block;
-      height: 250px;
-    }
-    .game-cover img {
-      display:block;
-      width:100%;
-      height:100%;
-      object-fit:cover;
-    }
+.game-cover {
+  width: 100%;
+  height: 160px; /* фиксированная высота обложки */
+  border-radius: 0.9rem;
+  overflow: hidden;
+  background: #020617;
+  flex-shrink: 0;
+}
+
+.game-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* чтобы картинка не растягивалась */
+  display: block;
+}
     .game-cover div {
       width:100%;
       height:100%;
