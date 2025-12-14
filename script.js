@@ -1,37 +1,6 @@
-// script.js — полностью переписанный, рабочий файл
-// ------------------------------------------------------------------
-// Требует корректный supabase-config.js, который экспортирует:
-//   export const supabase = createClient(...)
-//   export const ADMIN_EMAIL = "..."
-// ------------------------------------------------------------------
+// script.js — fixed
 
 import { supabase, ADMIN_EMAIL } from "./supabase-config.js";
-
-// ----------------------------
-// Quill подключение (добавлено)
-// ----------------------------
-
-// Убедись, что в index.html ДО script.js есть:
-// <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-// <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
-
-// Функция загрузки изображений из Quill в Supabase
-async function uploadGuideImage(file) {
-  const filename = `guides/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("images")
-    .upload(filename, file, { contentType: file.type });
-
-  if (uploadError) {
-    console.error("Ошибка загрузки изображения гайда:", uploadError);
-    alert("Не удалось загрузить изображение");
-    return null;
-  }
-
-  const { data } = supabase.storage.from("images").getPublicUrl(filename);
-  return data?.publicUrl || null;
-}
 
 // ----------------------------
 // DOM-элементы
@@ -51,6 +20,7 @@ const userInfo = document.getElementById("userInfo");
 let currentUser = null;
 let gamesCache = [];
 let gamesChannel = null;
+let gamesListenerStarted = false;
 
 // ----------------------------
 // Утилиты
@@ -71,7 +41,6 @@ function openModal(innerHtml) {
       <div class="modal">${innerHtml}</div>
     </div>
   `;
-  // Закрытие по клику вне модалки
   root.addEventListener("click", (e) => {
     if (e.target.classList.contains("modal-backdrop")) closeModal();
   });
@@ -83,14 +52,13 @@ function closeModal() {
   if (m) m.remove();
 }
 
-// Показываем alert и лог в консоль
 function showError(msg, err) {
   console.error(msg, err);
   alert(msg + (err && err.message ? ": " + err.message : ""));
 }
 
 // ----------------------------
-// AUTH (вход / регистрация / состояние)
+// AUTH
 // ----------------------------
 async function loadUser() {
   try {
@@ -102,8 +70,7 @@ async function loadUser() {
     }
     currentUser = session.user;
     updateAuthUI(true);
-  } catch (err) {
-    console.error("loadUser error", err);
+  } catch {
     currentUser = null;
     updateAuthUI(false);
   }
@@ -127,59 +94,38 @@ function updateAuthUI(isLogged) {
   addGameBtn.style.display = isAdmin ? "inline-flex" : "none";
 }
 
-// Отслеживаем изменения сессии, чтобы UI обновлялся автоматически
-supabase.auth.onAuthStateChange(async (event, session) => {
-  if (session?.user) {
-    currentUser = session.user;
-    updateAuthUI(true);
-  } else {
-    currentUser = null;
-    updateAuthUI(false);
-  }
-  startGamesListener();
+supabase.auth.onAuthStateChange(() => {
+  loadUser();
+  startGamesListener(true);
 });
 
 // ----------------------------
-// GAMES: загрузка / realtime / рендер
+// GAMES
 // ----------------------------
-async function startGamesListener() {
-  try {
-    const { data, error } = await supabase.from("games").select("*").order("title");
-    if (error) {
-      console.error("startGamesListener select error", error);
-      return;
-    }
-    gamesCache = data || [];
-    renderGames(gamesCache);
-  } catch (err) {
-    console.error("startGamesListener error", err);
-  }
+async function startGamesListener(force = false) {
+  if (gamesListenerStarted && !force) return;
+  gamesListenerStarted = true;
 
-  // убираем старый канал если есть
+  const { data } = await supabase.from("games").select("*").order("title");
+  gamesCache = data || [];
+  renderGames(gamesCache);
+
   if (gamesChannel) {
-    try { supabase.removeChannel(gamesChannel); } catch (e) {}
-    gamesChannel = null;
+    try { await supabase.removeChannel(gamesChannel); } catch {}
   }
 
-  // создаём realtime канал (обновляем список при изменениях)
-  try {
-    gamesChannel = supabase
-      .channel("games_changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "games" },
-        async () => {
-          const { data, error } = await supabase.from("games").select("*").order("title");
-          if (!error) {
-            gamesCache = data || [];
-            renderGames(gamesCache);
-          }
-        }
-      )
-      .subscribe();
-  } catch (err) {
-    console.warn("Realtime subscription failed:", err);
-  }
+  gamesChannel = supabase
+    .channel("games_changes")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "games" },
+      async () => {
+        const { data } = await supabase.from("games").select("*").order("title");
+        gamesCache = data || [];
+        renderGames(gamesCache);
+      }
+    )
+    .subscribe();
 }
 
 function renderGames(list) {
@@ -197,10 +143,9 @@ function renderGames(list) {
   list.forEach((g) => {
     const card = document.createElement("div");
     card.className = "card";
-
+    card.style.position = "relative";
     card.addEventListener("click", () => openGame(g.id));
 
-    // Cover
     const cover = document.createElement("div");
     cover.className = "game-cover";
 
@@ -219,499 +164,155 @@ function renderGames(list) {
       const btn = document.createElement("button");
       btn.className = "btn-small";
       btn.textContent = "Ред.";
-      btn.style.position = "absolute";
-      btn.style.right = "0.6rem";
-      btn.style.bottom = "0.6rem";
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        editGame(g.id);
-      });
-      cover.appendChild(btn);
+      btn.style.cssText = "position:absolute;right:0.6rem;bottom:0.6rem;z-index:5";
+      btn.onclick = (e) => { e.stopPropagation(); editGame(g.id); };
 
       const delBtn = document.createElement("button");
       delBtn.className = "btn-small";
       delBtn.textContent = "Удал.";
-      delBtn.style.position = "absolute";
-      delBtn.style.right = "3.6rem";
-      delBtn.style.bottom = "0.6rem";
-      delBtn.style.background = "#ef4444";
-      delBtn.style.color = "white";
-
-      delBtn.addEventListener("click", async (e) => {
+      delBtn.style.cssText = "position:absolute;right:3.6rem;bottom:0.6rem;z-index:5;background:#ef4444;color:white";
+      delBtn.onclick = async (e) => {
         e.stopPropagation();
         if (!confirm(`Удалить игру "${g.title || ""}"?`)) return;
-        try {
-          const res = await supabase.from("games").delete().eq("id", g.id);
-          if (res.error) return showError("Ошибка удаления игры", res.error);
-          await startGamesListener();
-        } catch (err) {
-          showError("Ошибка при удалении", err);
-        }
-      });
+        await supabase.from("games").delete().eq("id", g.id);
+        startGamesListener(true);
+      };
 
-      cover.appendChild(delBtn);
+      cover.append(btn, delBtn);
     }
 
     const header = document.createElement("div");
-    header.className = "card-header";
     header.innerHTML = `<h2>${escapeHTML(g.title)}</h2>`;
 
-    const footer = document.createElement("div");
-    footer.className = "card-footer";
-    footer.innerHTML = `<span class="pill">${escapeHTML(g.genre || "")}</span>`; // Платформа убрана
-
-    card.appendChild(cover);
-    card.appendChild(header);
-    card.appendChild(footer);
-
+    card.append(cover, header);
     cardsContainer.appendChild(card);
   });
 }
 
-
 // ----------------------------
-// ОТКРЫТИЕ ОДНОЙ ИГРЫ (начало)
+// OPEN GAME
 // ----------------------------
 async function openGame(id) {
-  try {
-    const { data: game, error } = await supabase.from("games").select("*").eq("id", id).maybeSingle();
-    if (error) return showError("Ошибка загрузки игры", error);
-    if (!game) return;
+  const { data: game } = await supabase.from("games").select("*").eq("id", id).maybeSingle();
+  if (!game) return;
 
-    breadcrumbs.style.display = "block";
-    breadcrumbs.innerHTML = `<span onclick="goHome()">Игры</span> / <strong>${escapeHTML(game.title)}</strong>`;
+  breadcrumbs.style.display = "block";
+  breadcrumbs.innerHTML = `<span onclick="goHome()">Игры</span> / <strong>${escapeHTML(game.title)}</strong>`;
 
-    cardsContainer.className = "";
-    cardsContainer.innerHTML = "";
+  cardsContainer.className = "";
+  cardsContainer.innerHTML = "";
 
-    const wrapper = document.createElement("div");
-    wrapper.className = "card game-guide";
+  const wrapper = document.createElement("div");
+  wrapper.className = "card game-guide";
 
-    const titleHTML = `<h2>${escapeHTML(game.title)}</h2>`;
-    const metaHTML = `<div class="game-guide-meta">Жанр: ${escapeHTML(game.genre || "")}</div>`;
+  wrapper.innerHTML = `
+    <h2>${escapeHTML(game.title)}</h2>
+    <div class="game-guide-meta">Жанр: ${escapeHTML(game.genre || "")}</div>
+    ${game.cover ? `<img src="${game.cover}" style="width:100%;height:200px;object-fit:cover;border-radius:0.9rem;margin-top:10px;">` : ""}
+  `;
 
-    const coverHTML = game.cover
-      ? `<img src="${game.cover}" style="width:100%;height:200px;object-fit:cover;border-radius:0.9rem;margin-top:10px;">`
-      : `<div style="padding:1rem;color:#9ca3af;margin-top:10px;">Нет изображения</div>`;
+  const contentView = document.createElement("div");
+  contentView.className = "game-guide-content";
+  contentView.innerHTML = game.guide || "";
 
-    wrapper.innerHTML = titleHTML + metaHTML + coverHTML;
+  const editor = document.createElement("div");
+  editor.id = "quillEditor";
+  editor.style.display = "none";
+  editor.innerHTML = "";
 
-    const contentView = document.createElement("div");
-    contentView.className = "game-guide-content";
-    contentView.innerHTML = game.guide || "";
+  const actions = document.createElement("div");
+  actions.style.display = "none";
+  actions.style.marginTop = "0.6rem";
 
-    // Старое textarea — будет заменено Quill
-    const editor = document.createElement("div");
-    editor.id = "quillEditor";
-    editor.style.display = "none";
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "btn-small primary";
+  saveBtn.textContent = "Сохранить";
 
-    const actions = document.createElement("div");
-    actions.style.display = "none";
-    actions.style.marginTop = "0.6rem";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "btn-small";
+  cancelBtn.textContent = "Отменить";
 
-    const saveBtn = document.createElement("button");
-    saveBtn.className = "btn-small primary";
-    saveBtn.textContent = "Сохранить";
+  actions.append(saveBtn, cancelBtn);
+  wrapper.append(contentView, editor, actions);
+  cardsContainer.appendChild(wrapper);
 
-    const cancelBtn = document.createElement("button");
-    cancelBtn.className = "btn-small";
-    cancelBtn.textContent = "Отменить";
+  if (currentUser?.email === ADMIN_EMAIL) {
+    contentView.style.display = "none";
+    editor.style.display = "block";
+    actions.style.display = "flex";
 
-    actions.append(saveBtn, cancelBtn);
+    const quill = new Quill("#quillEditor", {
+      theme: "snow",
+      modules: {
+        toolbar: {
+          container: [
+            [{ header: [1, 2, 3, false] }],
+            ["bold", "italic", "underline"],
+            [{ list: "ordered" }, { list: "bullet" }],
+            ["image"]
+          ],
+          handlers: {
+            image: function () {
+              const input = document.createElement("input");
+              input.type = "file";
+              input.accept = "image/*";
+              input.click();
 
-    wrapper.appendChild(contentView);
-    wrapper.appendChild(editor);
-    wrapper.appendChild(actions);
+              input.onchange = async () => {
+                const file = input.files[0];
+                if (!file) return;
 
-    cardsContainer.appendChild(wrapper);
-    // ============================
-    // ЕСЛИ АДМИН — ВКЛЮЧАЕМ РЕДАКТОР
-    // ============================
-    if (currentUser?.email === ADMIN_EMAIL) {
+                const filename = `guides/${id}_${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+                await supabase.storage.from("images").upload(filename, file);
+                const { data } = supabase.storage.from("images").getPublicUrl(filename);
 
-      // Прячем текст
-      contentView.style.display = "none";
-      editor.style.display = "block";
-      actions.style.display = "flex";
-
-      // ----------------------------
-      // ИНИЦИАЛИЗАЦИЯ QUILL
-      // ----------------------------
-      const quill = new Quill("#quillEditor", {
-        theme: "snow",
-        placeholder: "Напишите гайд... Можно вставлять картинки.",
-        modules: {
-          toolbar: {
-            container: [
-              [{ header: [1, 2, 3, false] }],
-              ["bold", "italic", "underline"],
-              [{ list: "ordered" }, { list: "bullet" }],
-              ["image", "code-block"],
-            ],
-            handlers: {
-              // КНОПКА "IMAGE" — НАША КАСТОМНАЯ
-              image: function () {
-                const input = document.createElement("input");
-                input.type = "file";
-                input.accept = "image/*";
-                input.click();
-
-                input.onchange = async () => {
-                  const file = input.files[0];
-                  if (!file) return;
-
-                  // загружаем файл
-                  const filename =
-                    "guides/" +
-                    id +
-                    "_" +
-                    Date.now() +
-                    "_" +
-                    file.name.replace(/\s+/g, "_");
-
-                  const { error: uploadError } = await supabase.storage
-                    .from("images")
-                    .upload(filename, file, {
-                      contentType: file.type,
-                    });
-
-                  if (uploadError) {
-                    console.error(uploadError);
-                    alert("Ошибка загрузки изображения");
-                    return;
-                  }
-
-                  // Получаем публичный URL
-                  const { data } = supabase.storage
-                    .from("images")
-                    .getPublicUrl(filename);
-
-                  const url = data.publicUrl;
-
-                  // Вставляем картинку в Quill
-                  const range = quill.getSelection();
-                  quill.insertEmbed(range.index, "image", url);
-                };
-              },
-            },
-          },
-        },
-      });
-
-      // Загружаем существующий HTML
-      quill.root.innerHTML = game.guide || "";
-
-      // ----------------------------
-      // КНОПКА "СОХРАНИТЬ"
-      // ----------------------------
-      saveBtn.onclick = async () => {
-        try {
-          const html = quill.root.innerHTML;
-
-          const { error } = await supabase
-            .from("games")
-            .update({ guide: html })
-            .eq("id", id);
-
-          if (error) return showError("Ошибка сохранения гайда", error);
-
-          openGame(id); // обновляем страницу игры
-        } catch (err) {
-          showError("Ошибка сохранения", err);
+                const range = quill.getSelection(true);
+                const index = range ? range.index : quill.getLength();
+                quill.insertEmbed(index, "image", data.publicUrl);
+              };
+            }
+          }
         }
-      };
-
-      cancelBtn.onclick = () => openGame(id);
-    }
-  } catch (err) {
-    showError("openGame error", err);
-  }
-}
-// ----------------------------
-// ДОБАВЛЕНИЕ ИГРЫ
-// ----------------------------
-addGameBtn.addEventListener("click", () => {
-  openModal(`
-    <h3>Добавление игры</h3>
-    <form id="addGameForm">
-      <div style="margin:0.35rem 0;"><label>Название</label><br><input id="gameTitle" required style="width:100%;"></div>
-      <div style="margin:0.35rem 0;"><label>Жанр</label><br><input id="gameGenre" style="width:100%;"></div>
-      <div style="margin:0.35rem 0;"><label>Обложка</label><br><input type="file" id="gameCoverFile" accept="image/*"></div>
-
-      <div class="modal-actions" style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.6rem;">
-        <button type="button" id="cancelAdd" class="btn-small">Отмена</button>
-        <button type="submit" class="btn-small primary">Добавить</button>
-      </div>
-    </form>
-  `);
-
-  const cancel = document.getElementById("cancelAdd");
-  const form = document.getElementById("addGameForm");
-
-  cancel.onclick = closeModal;
-
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const title = document.getElementById("gameTitle").value.trim();
-      const genre = document.getElementById("gameGenre").value.trim();
-      const fileEl = document.getElementById("gameCoverFile");
-      const file = fileEl?.files?.[0];
-
-      let coverUrl = "";
-
-      if (file) {
-        const filename = `covers/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
-        const { error: uploadError } = await supabase.storage
-          .from("images")
-          .upload(filename, file, { contentType: file.type });
-
-        if (uploadError) return showError("Ошибка при загрузке изображения", uploadError);
-
-        const { data } = supabase.storage.from("images").getPublicUrl(filename);
-        if (data?.publicUrl) coverUrl = data.publicUrl;
       }
-
-      const { error: insertErr } = await supabase.from("games").insert({
-        title,
-        genre,
-        cover: coverUrl,
-        guide: ""
-      });
-
-      if (insertErr) return showError("Ошибка добавления игры", insertErr);
-
-      await startGamesListener();
-      closeModal();
-    } catch (err) {
-      showError("Добавление игры упало", err);
-    }
-  };
-});
-
-
-// ----------------------------
-// РЕДАКТИРОВАНИЕ ИГРЫ
-// ----------------------------
-async function editGame(id) {
-  try {
-    const { data: game, error } = await supabase.from("games").select("*").eq("id", id).maybeSingle();
-    if (error) return showError("Ошибка чтения игры", error);
-    if (!game) return alert("Игра не найдена");
-
-    openModal(`
-      <h3>Редактирование игры</h3>
-      <form id="editGameForm">
-        <div style="margin:0.35rem 0;"><label>Название</label><br><input id="editTitle" value="${escapeHTML(game.title)}" style="width:100%;"></div>
-        <div style="margin:0.35rem 0;"><label>Жанр</label><br><input id="editGenre" value="${escapeHTML(game.genre || "")}" style="width:100%;"></div>
-        <div style="margin:0.35rem 0;"><label>Новая обложка</label><br><input id="editCoverFile" type="file" accept="image/*"></div>
-
-        <div class="modal-actions" style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.6rem;">
-          <button type="button" id="cancelEdit" class="btn-small">Отмена</button>
-          <button type="submit" class="btn-small primary">Сохранить</button>
-        </div>
-      </form>
-    `);
-
-    document.getElementById("cancelEdit").onclick = closeModal;
-
-    document.getElementById("editGameForm").onsubmit = async (e) => {
-      e.preventDefault();
-      try {
-        const title = document.getElementById("editTitle").value.trim();
-        const genre = document.getElementById("editGenre").value.trim();
-        const file = document.getElementById("editCoverFile").files[0];
-
-        let coverUrl = game.cover || "";
-
-        if (file) {
-          const filename = `covers/${id}_${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
-          const { error: uploadError } = await supabase.storage
-            .from("images")
-            .upload(filename, file, { upsert: true, contentType: file.type });
-
-          if (uploadError) return showError("Ошибка загрузки нового изображения", uploadError);
-
-          const { data } = supabase.storage.from("images").getPublicUrl(filename);
-          if (data?.publicUrl) coverUrl = data.publicUrl;
-        }
-
-        const { error: updateErr } = await supabase
-          .from("games")
-          .update({ title, genre, cover: coverUrl })
-          .eq("id", id);
-
-        if (updateErr) return showError("Ошибка сохранения игры", updateErr);
-
-        await startGamesListener();
-        closeModal();
-        openGame(id);
-      } catch (err) {
-        showError("editGame error", err);
-      }
-    };
-  } catch (err) {
-    showError("Ошибка editGame", err);
-  }
-}
-// ----------------------------
-// ПОИСК
-// ----------------------------
-if (searchInput) {
-  searchInput.addEventListener("input", () => {
-    const q = (searchInput.value || "").toLowerCase();
-    const filtered = gamesCache.filter((g) => {
-      return (
-        (g.title || "").toLowerCase().includes(q) ||
-        (g.genre || "").toLowerCase().includes(q) ||
-        (g.platform || "").toLowerCase().includes(q)
-      );
     });
-    renderGames(filtered);
-  });
+
+    quill.root.innerHTML = game.guide || "";
+
+    saveBtn.onclick = async () => {
+      await supabase.from("games").update({ guide: quill.root.innerHTML }).eq("id", id);
+      openGame(id);
+    };
+
+    cancelBtn.onclick = () => openGame(id);
+  }
 }
 
 // ----------------------------
-// ПРЕДЛОЖИТЬ ИГРУ
+// SEARCH
 // ----------------------------
-suggestGameBtn.addEventListener("click", () => {
-  openModal(`
-    <h3>Предложить игру</h3>
-    <form id="suggestForm">
-      <div style="margin:0.35rem 0;"><label>Название</label><br><input id="suggestTitle" required style="width:100%;"></div>
-      <div style="margin:0.35rem 0;"><label>Платформа</label><br><input id="suggestPlatform" style="width:100%;"></div>
-      <div style="margin:0.35rem 0;"><label>Причина</label><br><textarea id="suggestReason" style="width:100%;"></textarea></div>
-
-      <div class="modal-actions" style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.6rem;">
-        <button type="button" id="cancelSuggest" class="btn-small">Отмена</button>
-        <button type="submit" class="btn-small primary">Отправить</button>
-      </div>
-    </form>
-  `);
-
-  document.getElementById("cancelSuggest").onclick = closeModal;
-
-  document.getElementById("suggestForm").onsubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const title = document.getElementById("suggestTitle").value.trim();
-      const platform = document.getElementById("suggestPlatform").value.trim();
-      const reason = document.getElementById("suggestReason").value.trim();
-
-      const { error } = await supabase.from("suggestions").insert({ title, platform, reason });
-      if (error) return showError("Ошибка отправки предложения", error);
-
-      alert("Спасибо! Предложение отправлено.");
-      closeModal();
-    } catch (err) {
-      showError("suggestForm error", err);
-    }
-  };
+searchInput.addEventListener("input", () => {
+  const q = (searchInput.value || "").toLowerCase();
+  renderGames(
+    gamesCache.filter(g =>
+      (g.title || "").toLowerCase().includes(q) ||
+      (g.genre || "").toLowerCase().includes(q)
+    )
+  );
 });
 
 // ----------------------------
-// AUTH MODALS: Login / Register / Logout
+// LOGOUT
 // ----------------------------
-loginBtn.addEventListener("click", () => {
-  openModal(`
-    <h3>Вход</h3>
-    <form id="loginForm">
-      <div style="margin:0.35rem 0;"><label>Email</label><br><input id="loginEmail" type="email" required style="width:100%;"></div>
-      <div style="margin:0.35rem 0;"><label>Пароль</label><br><input id="loginPassword" type="password" required style="width:100%;"></div>
-
-      <div class="modal-actions" style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.6rem;">
-        <button type="button" id="cancelLogin" class="btn-small">Отмена</button>
-        <button type="submit" class="btn-small primary">Войти</button>
-      </div>
-    </form>
-  `);
-
-  const cancelLogin = document.getElementById("cancelLogin");
-  const loginForm = document.getElementById("loginForm");
-
-  cancelLogin.onclick = closeModal;
-
-  loginForm.onsubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const email = document.getElementById("loginEmail").value.trim();
-      const password = document.getElementById("loginPassword").value;
-
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return showError("Ошибка входа", error);
-
-      // сразу обновляем UI и данные — без F5
-      await loadUser();
-      await startGamesListener();
-      closeModal();
-    } catch (err) {
-      showError("login error", err);
-    }
-  };
-});
-
-registerBtn.addEventListener("click", () => {
-  openModal(`
-    <h3>Регистрация</h3>
-    <form id="registerForm">
-      <div style="margin:0.35rem 0;"><label>Имя</label><br><input id="regName" required style="width:100%;"></div>
-      <div style="margin:0.35rem 0;"><label>Email</label><br><input id="regEmail" type="email" required style="width:100%;"></div>
-      <div style="margin:0.35rem 0;"><label>Пароль</label><br><input id="regPassword" type="password" required style="width:100%;"></div>
-
-      <div class="modal-actions" style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.6rem;">
-        <button type="button" id="cancelReg" class="btn-small">Отмена</button>
-        <button type="submit" class="btn-small primary">Зарегистрироваться</button>
-      </div>
-    </form>
-  `);
-
-  const cancelReg = document.getElementById("cancelReg");
-  const registerForm = document.getElementById("registerForm");
-
-  cancelReg.onclick = closeModal;
-
-  registerForm.onsubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const name = document.getElementById("regName").value.trim();
-      const email = document.getElementById("regEmail").value.trim();
-      const password = document.getElementById("regPassword").value;
-
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) return showError("Ошибка регистрации", error);
-
-      // если пользователь сразу создан, добавим профиль в users (таблица)
-      if (data?.user) {
-        const { error: insertProfileErr } = await supabase.from("users").insert({
-          email,
-          name,
-          is_admin: email === ADMIN_EMAIL
-        });
-        if (insertProfileErr) console.warn("users insert warning:", insertProfileErr.message);
-      }
-
-      // обновляем UI (в ряде случаев нужно подтвердить email)
-      await loadUser();
-      await startGamesListener();
-      closeModal();
-    } catch (err) {
-      showError("register error", err);
-    }
-  };
-});
-
 logoutBtn.addEventListener("click", async () => {
-  try {
-    await supabase.auth.signOut();
-    currentUser = null;
-    updateAuthUI(false);
-    await startGamesListener();
-  } catch (err) {
-    showError("logout error", err);
-  }
+  await supabase.auth.signOut();
+  currentUser = null;
+  gamesListenerStarted = false;
+  updateAuthUI(false);
+  startGamesListener(true);
 });
+
 // ----------------------------
-// HOME / GO BACK
+// HOME
 // ----------------------------
 window.goHome = () => {
   breadcrumbs.style.display = "none";
@@ -719,9 +320,7 @@ window.goHome = () => {
   renderGames(gamesCache);
 };
 
-document.getElementById("logo").addEventListener("click", () => {
-  goHome();
-});
+document.getElementById("logo").addEventListener("click", goHome);
 
 // ----------------------------
 // INIT
