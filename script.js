@@ -290,7 +290,7 @@ async function openGame(id) {
     cardsContainer.innerHTML = "";
 
     const wrapper = document.createElement("div");
-    wrapper.className = "card game-guide";
+    wrapper.className = "game-guide";
 
     const titleHTML = `<h2>${escapeHTML(game.title)}</h2>`;
     const metaHTML = `<div class="game-guide-meta">Жанр: ${escapeHTML(game.genre || "")}</div>`;
