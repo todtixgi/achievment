@@ -192,65 +192,7 @@ function renderGames(list) {
     return;
   }
 
-  const isAdmin = currentUser?.email === ADMIN_EMAIL;
 
-  list.forEach((g) => {
-    const card = document.createElement("div");
-    card.className = "card";
-
-    card.addEventListener("click", () => openGame(g.id));
-
-    // Cover
-    const cover = document.createElement("div");
-    cover.className = "game-cover";
-
-    if (g.cover) {
-      const img = document.createElement("img");
-      img.src = g.cover;
-      img.alt = g.title || "cover";
-      cover.appendChild(img);
-    } else {
-      const no = document.createElement("div");
-      no.textContent = "Нет изображения";
-      cover.appendChild(no);
-    }
-
-    if (isAdmin) {
-      const btn = document.createElement("button");
-      btn.className = "btn-small";
-      btn.textContent = "Ред.";
-      btn.style.position = "absolute";
-      btn.style.right = "0.6rem";
-      btn.style.bottom = "0.6rem";
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        editGame(g.id);
-      });
-      cover.appendChild(btn);
-
-      const delBtn = document.createElement("button");
-      delBtn.className = "btn-small";
-      delBtn.textContent = "Удал.";
-      delBtn.style.position = "absolute";
-      delBtn.style.right = "3.6rem";
-      delBtn.style.bottom = "0.6rem";
-      delBtn.style.background = "#ef4444";
-      delBtn.style.color = "white";
-
-      delBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        if (!confirm(`Удалить игру "${g.title || ""}"?`)) return;
-        try {
-          const res = await supabase.from("games").delete().eq("id", g.id);
-          if (res.error) return showError("Ошибка удаления игры", res.error);
-          await startGamesListener();
-        } catch (err) {
-          showError("Ошибка при удалении", err);
-        }
-      });
-
-      cover.appendChild(delBtn);
-    }
 
     const header = document.createElement("div");
     header.className = "card-header";
@@ -264,9 +206,8 @@ function renderGames(list) {
     card.appendChild(header);
     card.appendChild(footer);
 
-    cardsContainer.appendChild(card);
-  });
-}
+   cardsContainer.appendChild(card);
+  };
 
 
 // ----------------------------
@@ -295,6 +236,36 @@ async function openGame(id) {
       : `<div style="padding:1rem;color:#9ca3af;margin-top:10px;">Нет изображения</div>`;
 
     wrapper.innerHTML = titleHTML + metaHTML + coverHTML;
+
+    // ===== КНОПКИ АДМИНА (ТОЛЬКО ВНУТРИ ИГРЫ) =====
+if (currentUser?.email === ADMIN_EMAIL) {
+  const adminActions = document.createElement("div");
+  adminActions.style.display = "flex";
+  adminActions.style.gap = "0.5rem";
+  adminActions.style.marginTop = "0.8rem";
+
+  const editBtn = document.createElement("button");
+  editBtn.className = "btn-small";
+  editBtn.textContent = "Редактировать игру";
+  editBtn.onclick = () => editGame(id);
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "btn-small";
+  deleteBtn.textContent = "Удалить игру";
+  deleteBtn.style.background = "#ef4444";
+  deleteBtn.style.color = "white";
+
+  deleteBtn.onclick = async () => {
+    if (!confirm("Удалить игру?")) return;
+    await supabase.from("games").delete().eq("id", id);
+    goHome();
+    await startGamesListener();
+  };
+
+  adminActions.append(editBtn, deleteBtn);
+  wrapper.appendChild(adminActions);
+}
+
 
     const contentView = document.createElement("div");
     contentView.className = "game-guide-content";
