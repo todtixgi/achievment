@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+  <title>Achievement Hub — Гайды для ачивок</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { background: #050816; color: #e5e7eb; min-height: 100vh; display: flex; flex-direction: column; }
+    header { border-bottom: 1px solid rgba(148,163,184,0.3); padding: 1rem 1.5rem; display:flex; justify-content:space-between; align-items:center; backdrop-filter: blur(8px); position: sticky; top:0; z-index:10; background: rgba(15,23,42,0.9); }
+    .logo { display:flex; flex-direction:column; cursor:pointer; }
+    .logo-title { font-size:1.2rem; font-weight:700; }
+    .logo-subtitle { font-size:0.8rem; color:#9ca3af; }
+    .header-right { display:flex; align-items:center; gap:0.5rem; }
+    .tag { font-size:0.7rem; padding:0.15rem 0.55rem; border-radius:999px; background: rgba(15,118,110,0.2); border:1px solid rgba(45,212,191,0.3); color:#a5f3fc; text-transform:uppercase; letter-spacing:0.05em; }
+    main { flex:1; max-width:1100px; width:100%; margin:1.5rem auto; padding:0 1rem 2rem; }
+    .top-bar { display:flex; flex-wrap:wrap; gap:0.75rem; margin-bottom:1.5rem; align-items:center; justify-content:space-between; }
+    .search-wrapper { flex:1; min-width:220px; position:relative; }
+    .search-wrapper input { width:100%; padding:0.6rem 0.8rem; border-radius:999px; border:1px solid rgba(148,163,184,0.5); background: rgba(15,23,42,0.8); color:#e5e7eb; outline:none; }
+    .search-wrapper input::placeholder { color:#6b7280; }
+    .view-toggle { display:flex; gap:0.5rem; align-items:center; }
+    .btn, .btn-small { border-radius:999px; padding:0.45rem 0.9rem; font-size:0.8rem; background:rgba(31,41,55,0.9); border:1px solid transparent; cursor:pointer; color:#e5e7eb; transition:0.15s ease; display:inline-flex; align-items:center; gap:0.25rem; }
+    .btn-small { padding:0.25rem 0.7rem; font-size:0.78rem; }
+    .btn:hover, .btn-small:hover { background: rgba(55,65,81,1); }
+    .btn.primary, .btn-small.primary { border-color:#6366f1; background: rgba(37,99,235,0.4); }
+    .btn-ghost { background:transparent; border-color: rgba(148,163,184,0.4); }
+    .btn-ghost:hover { background: rgba(31,41,55,0.9); }
+    .grid { display:grid; gap:1rem; }
+    .grid.games { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .card { border-radius:1rem; background: radial-gradient(circle at top left, rgba(30,64,175,0.35), rgba(15,23,42,0.95)); border:1px solid rgba(148,163,184,0.35); padding:0.85rem 0.9rem; box-shadow:0 12px 30px rgba(15,23,42,0.7); display:flex; flex-direction:column; gap:0.45rem; cursor:pointer; transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, background 0.2s ease; }
+    .card:hover { transform: translateY(-3px); box-shadow:0 16px 40px rgba(15,23,42,0.95); border-color:#6366f1; background: radial-gradient(circle at top left, rgba(79,70,229,0.5), rgba(15,23,42,0.98)); }
+    .card-header { display:flex; justify-content:space-between; align-items:center; gap:0.3rem; }
+    .card h2 { font-size:0.95rem; font-weight:600; }
+    .card-footer { margin-top:0.3rem; display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:#9ca3af; flex-wrap:wrap; gap:0.25rem; }
+    .pill { border-radius:999px; padding:0.15rem 0.6rem; border:1px solid rgba(148,163,184,0.6); font-size:0.7rem; }
+    .breadcrumbs { font-size:0.8rem; color:#9ca3af; margin-bottom:0.75rem; }
+    .breadcrumbs span { cursor:pointer; }
+    .breadcrumbs span:hover { text-decoration:underline; }
+    footer { font-size:0.75rem; text-align:center; padding:0.75rem 1rem 1rem; color:#6b7280; border-top:1px solid rgba(31,41,55,0.7); background: rgba(15,23,42,0.9); }
+    .game-cover { width:100%; border-radius:0.9rem; overflow:hidden; margin-bottom:0.6rem; background:#020617; display:block; }
+    .game-cover img { display:block; width:100%; height:140px; object-fit:cover; }
+    .game-guide { max-width:900px; }
+    .game-guide h2 { font-size:1.4rem; margin-bottom:0.4rem; }
+    .game-guide-meta { font-size:0.8rem; color:#9ca3af; margin-bottom:1rem; }
+    .game-guide-content { font-size:0.9rem; line-height:1.6; white-space:pre-wrap; }
+    .game-guide-editor { width:100%; min-height:260px; padding:0.8rem; border-radius:0.75rem; border:1px solid rgba(148,163,184,0.6); background: rgba(15,23,42,0.95); color:#e5e7eb; resize:vertical; font-family:inherit; font-size:0.9rem; line-height:1.5; outline:none; }
+    .editor-toolbar { display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.6rem; }
+    .modal-backdrop { position: fixed; inset:0; background: rgba(15,23,42,0.8); display:flex; align-items:center; justify-content:center; z-index:50; }
+    .modal { background:#020617; border-radius:1rem; border:1px solid rgba(148,163,184,0.6); padding:1.2rem 1rem 1rem; max-width:420px; width:100%; box-shadow:0 24px 80px rgba(0,0,0,0.8); }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <div class="logo" id="logo">
+    <span class="logo-title">Achievement Hub</span>
+    <span class="logo-subtitle">Гайды для ачивок в играх</span>
+  </div>
+
+  <div class="header-right">
+    <span class="user-label" id="userInfo"></span>
+    <button class="btn-ghost btn-small" id="loginBtn">Вход</button>
+    <button class="btn primary btn-small" id="registerBtn">Регистрация</button>
+    <button class="btn-ghost btn-small" id="logoutBtn" style="display:none;">Выйти</button>
+    <span class="tag">beta</span>
+  </div>
+</header>
+
+<main>
+  <div class="top-bar">
+    <div class="search-wrapper">
+      <input id="search" type="text" placeholder="Поиск по игре..." />
+    </div>
+    <div class="view-toggle">
+      <button class="btn primary btn-small" id="addGameBtn" style="display:none;">+ Добавить игру (админ)</button>
+      <button class="btn btn-small" id="suggestGameBtn">Предложить игру</button>
+    </div>
+  </div>
+
+  <div id="breadcrumbs" class="breadcrumbs" style="display: none;"></div>
+  <div id="cardsContainer" class="grid games"></div>
+</main>
+
+<footer>
+  Всё, что ты пишешь в гайдах, теперь хранится в Firestore.
+</footer>
+
+<script type="module" src="script.js"></script>
+
+</body>
+</html>
