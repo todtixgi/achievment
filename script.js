@@ -299,7 +299,8 @@ async function openGame(id) {
     wrapper.className = "card game-guide";
 
     const titleHTML = `<h2>${escapeHTML(game.title)}</h2>`;
-    const metaHTML = `<div class="game-guide-meta">Платформа: ${escapeHTML(game.platform || "")} • Жанр: ${escapeHTML(game.genre || "")}</div>`;
+    const metaHTML = `<div class="game-guide-meta">Жанр: ${escapeHTML(game.genre || "")}</div>`;
+
     const coverHTML = game.cover
       ? `<img src="${game.cover}" style="width:100%;height:200px;object-fit:cover;border-radius:0.9rem;margin-top:10px;">`
       : `<div style="padding:1rem;color:#9ca3af;margin-top:10px;">Нет изображения</div>`;
