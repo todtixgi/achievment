@@ -446,7 +446,6 @@ addGameBtn.addEventListener("click", () => {
     <h3>Добавление игры</h3>
     <form id="addGameForm">
       <div style="margin:0.35rem 0;"><label>Название</label><br><input id="gameTitle" required style="width:100%;"></div>
-      <div style="margin:0.35rem 0;"><label>Платформа</label><br><input id="gamePlatform" style="width:100%;"></div>
       <div style="margin:0.35rem 0;"><label>Жанр</label><br><input id="gameGenre" style="width:100%;"></div>
       <div style="margin:0.35rem 0;"><label>Обложка</label><br><input type="file" id="gameCoverFile" accept="image/*"></div>
 
