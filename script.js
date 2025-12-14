@@ -36,9 +36,6 @@ async function uploadGuideImage(file) {
 // ----------------------------
 // DOM-элементы
 // ----------------------------
-const searchInput = document.getElementById("search");
-const cardsContainer = document.getElementById("cardsContainer");
-const breadcrumbs = document.getElementById("breadcrumbs");
 
 const addGameBtn = document.getElementById("addGameBtn");
 const suggestGameBtn = document.getElementById("suggestGameBtn");
@@ -51,7 +48,15 @@ const userInfo = document.getElementById("userInfo");
 let currentUser = null;
 let gamesCache = [];
 let gamesChannel = null;
+let breadcrumbs;
+let cardsContainer;
+let searchInput;
 
+function initDOM() {
+  breadcrumbs = document.getElementById("breadcrumbs");
+  cardsContainer = document.getElementById("cardsContainer");
+  searchInput = document.getElementById("search");
+}
 // ----------------------------
 // Утилиты
 // ----------------------------
@@ -727,6 +732,7 @@ document.getElementById("logo").addEventListener("click", () => {
 // INIT
 // ----------------------------
 (async function init() {
+  initDOM();           // ← ВАЖНО
   await loadUser();
   await startGamesListener();
 })();
