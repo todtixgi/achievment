@@ -300,6 +300,7 @@ async function openGame(id) {
     contentView.className = "game-guide-content";
     contentView.innerHTML = game.guide || "";
 
+    // Старое textarea — будет заменено Quill
     const editor = document.createElement("div");
     editor.id = "quillEditor";
     editor.style.display = "none";
@@ -322,46 +323,20 @@ async function openGame(id) {
     wrapper.appendChild(editor);
     wrapper.appendChild(actions);
 
+    cardsContainer.appendChild(wrapper);
     // ============================
-    // КНОПКИ И РЕДАКТОР ДЛЯ АДМИНА
+    // ЕСЛИ АДМИН — ВКЛЮЧАЕМ РЕДАКТОР
     // ============================
     if (currentUser?.email === ADMIN_EMAIL) {
-      // Кнопки редактирования и удаления
-      const adminActions = document.createElement("div");
-      adminActions.style.marginTop = "0.6rem";
-      adminActions.style.display = "flex";
-      adminActions.style.gap = "0.5rem";
 
-      const editBtn = document.createElement("button");
-      editBtn.className = "btn-small primary";
-      editBtn.textContent = "Редактировать";
-      editBtn.onclick = () => editGame(id);
-
-      const delBtn = document.createElement("button");
-      delBtn.className = "btn-small";
-      delBtn.textContent = "Удалить";
-      delBtn.style.background = "#ef4444";
-      delBtn.style.color = "white";
-      delBtn.onclick = async () => {
-        if (!confirm(`Удалить игру "${game.title}"?`)) return;
-        try {
-          const res = await supabase.from("games").delete().eq("id", id);
-          if (res.error) return showError("Ошибка удаления игры", res.error);
-          await startGamesListener();
-          goHome();
-        } catch (err) {
-          showError("Ошибка при удалении", err);
-        }
-      };
-
-      adminActions.append(editBtn, delBtn);
-      wrapper.appendChild(adminActions);
-
-      // Включаем Quill
+      // Прячем текст
       contentView.style.display = "none";
       editor.style.display = "block";
       actions.style.display = "flex";
 
+      // ----------------------------
+      // ИНИЦИАЛИЗАЦИЯ QUILL
+      // ----------------------------
       const quill = new Quill("#quillEditor", {
         theme: "snow",
         placeholder: "Напишите гайд... Можно вставлять картинки.",
@@ -374,7 +349,8 @@ async function openGame(id) {
               ["image", "code-block"],
             ],
             handlers: {
-              image: async function () {
+              // КНОПКА "IMAGE" — НАША КАСТОМНАЯ
+              image: function () {
                 const input = document.createElement("input");
                 input.type = "file";
                 input.accept = "image/*";
@@ -384,11 +360,20 @@ async function openGame(id) {
                   const file = input.files[0];
                   if (!file) return;
 
-                  const filename = "guides/" + id + "_" + Date.now() + "_" + file.name.replace(/\s+/g, "_");
+                  // загружаем файл
+                  const filename =
+                    "guides/" +
+                    id +
+                    "_" +
+                    Date.now() +
+                    "_" +
+                    file.name.replace(/\s+/g, "_");
 
                   const { error: uploadError } = await supabase.storage
                     .from("images")
-                    .upload(filename, file, { contentType: file.type });
+                    .upload(filename, file, {
+                      contentType: file.type,
+                    });
 
                   if (uploadError) {
                     console.error(uploadError);
@@ -396,9 +381,14 @@ async function openGame(id) {
                     return;
                   }
 
-                  const { data } = supabase.storage.from("images").getPublicUrl(filename);
+                  // Получаем публичный URL
+                  const { data } = supabase.storage
+                    .from("images")
+                    .getPublicUrl(filename);
+
                   const url = data.publicUrl;
 
+                  // Вставляем картинку в Quill
                   const range = quill.getSelection();
                   quill.insertEmbed(range.index, "image", url);
                 };
@@ -408,14 +398,24 @@ async function openGame(id) {
         },
       });
 
+      // Загружаем существующий HTML
       quill.root.innerHTML = game.guide || "";
 
+      // ----------------------------
+      // КНОПКА "СОХРАНИТЬ"
+      // ----------------------------
       saveBtn.onclick = async () => {
         try {
           const html = quill.root.innerHTML;
-          const { error } = await supabase.from("games").update({ guide: html }).eq("id", id);
+
+          const { error } = await supabase
+            .from("games")
+            .update({ guide: html })
+            .eq("id", id);
+
           if (error) return showError("Ошибка сохранения гайда", error);
-          openGame(id);
+
+          openGame(id); // обновляем страницу игры
         } catch (err) {
           showError("Ошибка сохранения", err);
         }
@@ -423,13 +423,10 @@ async function openGame(id) {
 
       cancelBtn.onclick = () => openGame(id);
     }
-
-    cardsContainer.appendChild(wrapper);
   } catch (err) {
     showError("openGame error", err);
   }
 }
-
 // ----------------------------
 // ДОБАВЛЕНИЕ ИГРЫ
 // ----------------------------
