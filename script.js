@@ -192,22 +192,43 @@ function renderGames(list) {
     return;
   }
 
+  list.forEach((g) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.addEventListener("click", () => openGame(g.id));
 
+    // cover
+    const cover = document.createElement("div");
+    cover.className = "game-cover";
 
+    if (g.cover) {
+      const img = document.createElement("img");
+      img.src = g.cover;
+      img.alt = g.title || "cover";
+      cover.appendChild(img);
+    } else {
+      const no = document.createElement("div");
+      no.textContent = "Нет изображения";
+      cover.appendChild(no);
+    }
+
+    // header
     const header = document.createElement("div");
     header.className = "card-header";
     header.innerHTML = `<h2>${escapeHTML(g.title)}</h2>`;
 
+    // footer
     const footer = document.createElement("div");
     footer.className = "card-footer";
-    footer.innerHTML = `<span class="pill">${escapeHTML(g.genre || "")}</span>`; // Платформа убрана
+    footer.innerHTML = `<span class="pill">${escapeHTML(g.genre || "")}</span>`;
 
     card.appendChild(cover);
     card.appendChild(header);
     card.appendChild(footer);
 
-   cardsContainer.appendChild(card);
-  };
+    cardsContainer.appendChild(card);
+  });
+}
 
 
 // ----------------------------
