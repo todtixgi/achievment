@@ -456,7 +456,6 @@ addGameBtn.addEventListener("click", () => {
     </form>
   `);
 
-  // Надёжно навешиваем обработчики *после* вставки HTML
   const cancel = document.getElementById("cancelAdd");
   const form = document.getElementById("addGameForm");
 
@@ -466,7 +465,6 @@ addGameBtn.addEventListener("click", () => {
     e.preventDefault();
     try {
       const title = document.getElementById("gameTitle").value.trim();
-      const platform = document.getElementById("gamePlatform").value.trim();
       const genre = document.getElementById("gameGenre").value.trim();
       const fileEl = document.getElementById("gameCoverFile");
       const file = fileEl?.files?.[0];
@@ -479,9 +477,7 @@ addGameBtn.addEventListener("click", () => {
           .from("images")
           .upload(filename, file, { contentType: file.type });
 
-        if (uploadError) {
-          return showError("Ошибка при загрузке изображения", uploadError);
-        }
+        if (uploadError) return showError("Ошибка при загрузке изображения", uploadError);
 
         const { data } = supabase.storage.from("images").getPublicUrl(filename);
         if (data?.publicUrl) coverUrl = data.publicUrl;
@@ -489,7 +485,6 @@ addGameBtn.addEventListener("click", () => {
 
       const { error: insertErr } = await supabase.from("games").insert({
         title,
-        platform,
         genre,
         cover: coverUrl,
         guide: ""
@@ -497,7 +492,6 @@ addGameBtn.addEventListener("click", () => {
 
       if (insertErr) return showError("Ошибка добавления игры", insertErr);
 
-      // обновляем список и закрываем модалку
       await startGamesListener();
       closeModal();
     } catch (err) {
@@ -505,6 +499,7 @@ addGameBtn.addEventListener("click", () => {
     }
   };
 });
+
 
 // ----------------------------
 // РЕДАКТИРОВАНИЕ ИГРЫ
@@ -519,7 +514,6 @@ async function editGame(id) {
       <h3>Редактирование игры</h3>
       <form id="editGameForm">
         <div style="margin:0.35rem 0;"><label>Название</label><br><input id="editTitle" value="${escapeHTML(game.title)}" style="width:100%;"></div>
-        <div style="margin:0.35rem 0;"><label>Платформа</label><br><input id="editPlatform" value="${escapeHTML(game.platform || "")}" style="width:100%;"></div>
         <div style="margin:0.35rem 0;"><label>Жанр</label><br><input id="editGenre" value="${escapeHTML(game.genre || "")}" style="width:100%;"></div>
         <div style="margin:0.35rem 0;"><label>Новая обложка</label><br><input id="editCoverFile" type="file" accept="image/*"></div>
 
@@ -536,7 +530,6 @@ async function editGame(id) {
       e.preventDefault();
       try {
         const title = document.getElementById("editTitle").value.trim();
-        const platform = document.getElementById("editPlatform").value.trim();
         const genre = document.getElementById("editGenre").value.trim();
         const file = document.getElementById("editCoverFile").files[0];
 
@@ -556,7 +549,7 @@ async function editGame(id) {
 
         const { error: updateErr } = await supabase
           .from("games")
-          .update({ title, platform, genre, cover: coverUrl })
+          .update({ title, genre, cover: coverUrl })
           .eq("id", id);
 
         if (updateErr) return showError("Ошибка сохранения игры", updateErr);
